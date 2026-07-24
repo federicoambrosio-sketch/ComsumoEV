@@ -48,7 +48,7 @@ export default async function handler(req, res) {
           "Authorization": `Bearer ${TOKEN}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ fields })
+        body: JSON.stringify({ fields, typecast: true })
       }
     );
 
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
 
     if (!airtableRes.ok) {
       console.error("Error de Airtable:", data);
-      return res.status(airtableRes.status).json({ error: "Error al guardar en Airtable" });
+      return res.status(airtableRes.status).json({ error: "Error al guardar en Airtable", detail: data });
     }
 
     return res.status(200).json({ ok: true, id: data.id });
