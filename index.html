@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Evaluación de Consumo Energético</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
+<!-- jsPDF (para descarga del resumen) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #f4f6f4;
+    --paper: #ffffff;
+    --ink: #16241f;
+    --ink-soft: #4d5c56;
+    --line: #dbe3de;
+    --primary: #1f5c4a;
+    --primary-dark: #143d31;
+    --accent: #e8a33d;
+    --good: #2e7d4f;
+    --warn: #c9781f;
+    --bad: #b5432f;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    margin: 0;
+    padding: 32px 16px 80px;
+  }
+
+  .container { max-width: 880px; margin: 0 auto; }
+
+  header.page-head {
+    margin-bottom: 28px;
+  }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin: 0 0 6px;
+  }
+
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(26px, 4vw, 34px);
+    margin: 0 0 8px;
+    color: var(--primary-dark);
+  }
+
+  .lede {
+    color: var(--ink-soft);
+    max-width: 60ch;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-top: 20px;
+  }
+
+  h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    margin: 0 0 4px;
+    color: var(--primary-dark);
+  }
+
+  .help-box {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background: #fbf6ea;
+    border: 1px solid #ecdcae;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 0 0 16px;
+  }
+  .help-box .icon {
+    font-size: 16px;
+    line-height: 1.3;
+  }
+  .help-box .help-text { flex: 1; min-width: 180px; }
+  .help-box p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+  .help-box strong { color: var(--ink); }
+  .help-box .mini-chart {
+    flex-shrink: 0;
+    width: 150px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px;
+  }
+  .mini-chart-caption {
+    font-size: 10px;
+    color: var(--ink-soft);
+    text-align: center;
+    margin-top: 3px;
+    font-style: italic;
+  }
+
+  .section-hint {
+    color: var(--ink-soft);
+    font-size: 13px;
+    margin: 0 0 16px;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    margin-top: 14px;
+    margin-bottom: 4px;
+  }
+
+  input, select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  input:focus, select:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+    border-color: var(--primary);
+  }
+
+  input:disabled { color: var(--ink-soft); background: #f1f3f1; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 4px 14px;
+  }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0 16px;
+  }
+
+  button {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    border: none;
+    border-radius: 999px;
+    padding: 13px 26px;
+    cursor: pointer;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    margin-top: 22px;
+    width: 100%;
+  }
+  .btn-primary:hover { background: var(--primary-dark); }
+
+  .btn-secondary {
+    background: var(--accent);
+    color: var(--ink);
+    margin-top: 4px;
+  }
+  .btn-secondary:hover { filter: brightness(0.95); }
+
+  #resultados { display: none; }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-top: 8px;
+  }
+
+  .stat {
+    background: #eef4f0;
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .stat-value {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin-top: 2px;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-top: 8px;
+  }
+  .badge-good { background: #e2f2e6; color: var(--good); }
+  .badge-warn { background: #fbedd9; color: var(--warn); }
+  .badge-bad  { background: #fbe4de; color: var(--bad); }
+
+  #recomendaciones {
+    margin-top: 18px;
+    padding: 16px 18px;
+    border-left: 3px solid var(--primary);
+    background: #f6faf7;
+    border-radius: 0 8px 8px 0;
+  }
+  #recomendaciones h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    margin: 0 0 8px;
+    color: var(--primary-dark);
+  }
+  #recomendaciones p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink); }
+  .contacto-preetiqueta {
+    margin-top: 10px !important;
+    font-weight: 600;
+    color: var(--primary-dark) !important;
+    font-size: 13px !important;
+  }
+
+  canvas { margin-top: 8px; max-height: 280px; }
+
+  .disclaimer {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 22px;
+    line-height: 1.5;
+  }
+
+  .actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .actions button { flex: 1; min-width: 200px; }
+
+  #estadoGuardado {
+    font-size: 13px;
+    margin-top: 10px;
+    color: var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="page-head">
+    <p class="eyebrow">Relevamiento de consumo residencial · Argentina</p>
+    <h1>Evaluación de Consumo Energético</h1>
+    <p class="lede">Cargá tus últimas facturas de luz y gas para ver tu indicador energético, compararlo y descargar un resumen en PDF.</p>
+  </header>
+
+  <!-- DATOS DE LA VIVIENDA -->
+  <div class="card">
+    <h2>Datos de la vivienda</h2>
+    <label for="obra">Nombre de la obra o vivienda</label>
+    <input type="text" id="obra" placeholder="Ej: Casa Los Aromos, Depto Palermo, Obra Ruta 8...">
+    <p class="section-hint" style="margin-top:4px">Es solo para que identifiques tu PDF. No se usa para identificar a la persona.</p>
+    <div class="two-col" style="margin-top:6px">
+      <div>
+        <label for="superficie">Superficie cubierta (m²)</label>
+        <input type="number" id="superficie" min="0">
+      </div>
+      <div>
+        <label for="provincia">Provincia</label>
+        <select id="provincia">
+          <option value="">Seleccionar provincia</option>
+          <option>Buenos Aires</option>
+          <option>CABA</option>
+          <option>Catamarca</option>
+          <option>Chaco</option>
+          <option>Chubut</option>
+          <option>Córdoba</option>
+          <option>Corrientes</option>
+          <option>Entre Ríos</option>
+          <option>Formosa</option>
+          <option>Jujuy</option>
+          <option>La Pampa</option>
+          <option>La Rioja</option>
+          <option>Mendoza</option>
+          <option>Misiones</option>
+          <option>Neuquén</option>
+          <option>Río Negro</option>
+          <option>Salta</option>
+          <option>San Juan</option>
+          <option>San Luis</option>
+          <option>Santa Cruz</option>
+          <option>Santa Fe</option>
+          <option>Santiago del Estero</option>
+          <option>Tierra del Fuego</option>
+          <option>Tucumán</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ELECTRICIDAD -->
+  <div class="card">
+    <h2>Consumo eléctrico (kWh)</h2>
+    <div class="help-box">
+      <span class="icon">📍</span>
+      <div class="help-text">
+        <p>
+          <strong>¿Dónde lo encuentro?</strong> En Edesur está en la parte superior izquierda de la factura, en el gráfico de barras
+          <strong>"Evolución de su consumo de Energía"</strong>. Cada barra muestra el consumo mensual en kWh, con el valor escrito arriba.
+          Tomá los últimos 6 valores, de izquierda a derecha (más antiguo → más reciente). En Edenor el gráfico puede tener otro nombre o ubicación,
+          pero suele estar en un formato similar cerca del detalle de consumo.
+        </p>
+      </div>
+      <div class="mini-chart">
+        <svg viewBox="0 0 140 80" width="100%" xmlns="http://www.w3.org/2000/svg">
+          <text x="4" y="8" font-size="6" fill="#4d5c56">kWh</text>
+          <text x="18" y="26" font-size="7" fill="#16241f" text-anchor="middle">158</text>
+          <rect x="10" y="30" width="14" height="34" fill="#1f5c4a"/>
+          <text x="38" y="22" font-size="7" fill="#16241f" text-anchor="middle">165</text>
+          <rect x="30" y="26" width="14" height="38" fill="#1f5c4a"/>
+          <text x="58" y="38" font-size="7" fill="#16241f" text-anchor="middle">78</text>
+          <rect x="50" y="42" width="14" height="22" fill="#1f5c4a"/>
+          <text x="78" y="40" font-size="7" fill="#16241f" text-anchor="middle">81</text>
+          <rect x="70" y="44" width="14" height="20" fill="#1f5c4a"/>
+          <text x="98" y="52" font-size="7" fill="#16241f" text-anchor="middle">49</text>
+          <rect x="90" y="56" width="14" height="8" fill="#1f5c4a"/>
+          <text x="118" y="52" font-size="7" fill="#16241f" text-anchor="middle">49</text>
+          <rect x="110" y="56" width="14" height="8" fill="#e8a33d"/>
+          <line x1="6" y1="64" x2="130" y2="64" stroke="#dbe3de" stroke-width="1"/>
+          <text x="17" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">07/25</text>
+          <text x="37" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">08/25</text>
+          <text x="57" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">09/25</text>
+          <text x="77" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">10/25</text>
+          <text x="97" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">11/25</text>
+          <text x="117" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">12/25</text>
+        </svg>
+        <div class="mini-chart-caption">Ejemplo ilustrativo</div>
+      </div>
+    </div>
+    <p class="section-hint">Últimos 6 períodos de factura, del más antiguo al más reciente.</p>
+    <div class="grid" id="grid_elec"></div>
+  </div>
+
+  <!-- GAS -->
+  <div class="card">
+    <h2>Consumo de gas</h2>
+    <div class="help-box">
+      <span class="icon">📍</span>
+      <div class="help-text">
+        <p>
+          <strong>¿Dónde lo encuentro?</strong> En Metrogas está en la mitad derecha de la factura, en el gráfico de barras
+          <strong>"Gráfico de consumo de gas en m³"</strong>. Cada barra corresponde a un bimestre, con el valor en m³ escrito arriba.
+          Tomá los últimos 6 valores, de izquierda a derecha (más antiguo → más reciente).
+        </p>
+      </div>
+      <div class="mini-chart">
+        <svg viewBox="0 0 140 80" width="100%" xmlns="http://www.w3.org/2000/svg">
+          <text x="4" y="8" font-size="6" fill="#4d5c56">m³</text>
+          <text x="18" y="34" font-size="7" fill="#16241f" text-anchor="middle">202</text>
+          <rect x="10" y="38" width="14" height="26" fill="#e8a33d"/>
+          <text x="38" y="40" font-size="7" fill="#16241f" text-anchor="middle">183</text>
+          <rect x="30" y="44" width="14" height="20" fill="#e8a33d"/>
+          <text x="58" y="20" font-size="7" fill="#16241f" text-anchor="middle">332</text>
+          <rect x="50" y="24" width="14" height="40" fill="#e8a33d"/>
+          <text x="78" y="20" font-size="7" fill="#16241f" text-anchor="middle">332</text>
+          <rect x="70" y="24" width="14" height="40" fill="#e8a33d"/>
+          <text x="98" y="40" font-size="7" fill="#16241f" text-anchor="middle">183</text>
+          <rect x="90" y="44" width="14" height="20" fill="#e8a33d"/>
+          <text x="118" y="50" font-size="7" fill="#16241f" text-anchor="middle">128</text>
+          <rect x="110" y="54" width="14" height="10" fill="#e8a33d"/>
+          <line x1="6" y1="64" x2="130" y2="64" stroke="#dbe3de" stroke-width="1"/>
+          <text x="17" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">nov-20</text>
+          <text x="37" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">ene-21</text>
+          <text x="57" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">mar-21</text>
+          <text x="77" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">jun-21</text>
+          <text x="97" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">sep-21</text>
+          <text x="117" y="72" font-size="5.5" fill="#4d5c56" text-anchor="middle">nov-21</text>
+        </svg>
+        <div class="mini-chart-caption">Ejemplo ilustrativo</div>
+      </div>
+    </div>
+    <p class="section-hint">Solo gas natural de red, ya que es el que se mide por período en la factura. El GLP en garrafa o tanque no tiene una lectura periódica comparable.</p>
+    <div class="two-col">
+      <div>
+        <label>Combustible</label>
+        <input type="text" value="Gas Natural (red)" disabled>
+      </div>
+      <div>
+        <label>PCI de referencia</label>
+        <input type="text" value="10.8 kWh/m³" disabled>
+      </div>
+    </div>
+    <p class="section-hint" style="margin-top:14px">Últimos 6 períodos de factura, en m³.</p>
+    <div class="grid" id="grid_gas"></div>
+  </div>
+
+  <button class="btn-primary" onclick="procesar()">Calcular mi indicador</button>
+
+  <!-- RESULTADOS -->
+  <div class="card" id="resultados">
+    <h2>Tu resultado<span id="tituloObra"></span></h2>
+
+    <div class="stat-row">
+      <div class="stat">
+        <div class="stat-label">Indicador energético</div>
+        <div class="stat-value"><span id="indicador"></span> kWh/m²·año</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Energía primaria total anual</div>
+        <div class="stat-value"><span id="ep_total"></span> kWh</div>
+      </div>
+    </div>
+
+    <div id="recomendaciones">
+      <h3>¿Querés ir más a fondo?</h3>
+      <p id="textoPreetiqueta">Este resultado es un primer panorama de tu consumo. Si querés ir más a fondo, podemos calcular una preetiqueta energética según los criterios del PRONEV, con información más precisa sobre el comportamiento energético de tu vivienda.</p>
+      <p class="contacto-preetiqueta">Arq. Federico Ambrosio · federico.ambrosio@gmail.com</p>
+    </div>
+
+    <h2 style="margin-top:26px">Energía secundaria (consumo) por fuente y período</h2>
+    <canvas id="graficoUtil"></canvas>
+
+    <h2 style="margin-top:26px">Energía primaria total por período</h2>
+    <canvas id="graficoPrimaria"></canvas>
+
+    <h2 style="margin-top:26px">Distribución del consumo por fuente</h2>
+    <canvas id="graficoTorta"></canvas>
+
+    <div class="actions" style="margin-top:24px">
+      <button class="btn-secondary" onclick="descargarPDF()">Descargar mi resumen (PDF)</button>
+    </div>
+    <div id="estadoGuardado"></div>
+
+    <p class="disclaimer">
+      Los rangos de referencia son orientativos, basados en literatura general de eficiencia energética residencial en Argentina.
+      A medida que se sumen más viviendas a la base, tu comparación va a reflejar el promedio real de usuarios similares en tu provincia.
+    </p>
+  </div>
+
+</div>
+
+<script>
+/* ===== FACTORES DE ENERGÍA PRIMARIA (verificados) ===== */
+const FACTOR_ELEC = 3.3;   // factor de energía primaria de electricidad (matriz eléctrica AR)
+const FACTOR_GAS  = 1.25;  // factor de energía primaria de gas (PRONEV)
+const PCI_GAS_NATURAL = 10.8; // kWh/m³ (Secretaría de Energía)
+
+/* ===== ARMADO DINÁMICO DE CAMPOS ===== */
+const gridElec = document.getElementById("grid_elec");
+const gridGas = document.getElementById("grid_gas");
+for (let i = 1; i <= 6; i++) {
+  gridElec.insertAdjacentHTML("beforeend", `
+    <div>
+      <label>Período ${i}</label>
+      <input type="number" id="elec_${i}" min="0">
+    </div>`);
+  gridGas.insertAdjacentHTML("beforeend", `
+    <div>
+      <label>Período ${i}</label>
+      <input type="number" id="gas_${i}" min="0">
+    </div>`);
+}
+
+let ultimoResultado = null; // guardamos el último cálculo para el PDF y el guardado
+
+const TEXTO_PREETIQUETA = "Este resultado es un primer panorama de tu consumo. Si querés ir más a fondo, podemos calcular una preetiqueta energética según los criterios del PRONEV, con información más precisa sobre el comportamiento energético de tu vivienda.";
+const CONTACTO_PREETIQUETA = "Arq. Federico Ambrosio · federico.ambrosio@gmail.com";
+
+function procesar() {
+  const superficie = Number(document.getElementById("superficie").value);
+  const provincia = document.getElementById("provincia").value;
+  const obra = document.getElementById("obra").value.trim();
+
+  if (!superficie || !provincia) {
+    alert("Completar superficie y provincia");
+    return;
+  }
+
+  const elec = [];
+  const gas_m3 = [];
+  for (let i = 1; i <= 6; i++) {
+    elec.push(Number(document.getElementById(`elec_${i}`).value || 0));
+    gas_m3.push(Number(document.getElementById(`gas_${i}`).value || 0));
+  }
+
+  const gas_kwh = gas_m3.map(v => v * PCI_GAS_NATURAL);
+  const elecPrim = elec.map(v => v * FACTOR_ELEC);
+  const gasPrim = gas_kwh.map(v => v * FACTOR_GAS);
+
+  const euElecTotal = elec.reduce((a, b) => a + b, 0);
+  const euGasTotal = gas_kwh.reduce((a, b) => a + b, 0);
+  const elecPrimTotal = elecPrim.reduce((a, b) => a + b, 0);
+  const gasPrimTotal = gasPrim.reduce((a, b) => a + b, 0);
+  const epTotal = elecPrimTotal + gasPrimTotal;
+  const indicador = epTotal / superficie;
+
+  /* ===== GRÁFICOS ===== */
+  ["graficoUtil", "graficoPrimaria", "graficoTorta"].forEach(id => {
+    const existente = Chart.getChart(id);
+    if (existente) existente.destroy();
+  });
+
+  new Chart(document.getElementById("graficoUtil"), {
+    type: "bar",
+    data: {
+      labels: ["P1","P2","P3","P4","P5","P6"],
+      datasets: [
+        { label: "Electricidad (kWh)", data: elec, backgroundColor: "#1f5c4a" },
+        { label: "Gas (kWh)", data: gas_kwh, backgroundColor: "#e8a33d" }
+      ]
+    }
+  });
+
+  const epPorPeriodo = elecPrim.map((v, i) => v + gasPrim[i]);
+
+  new Chart(document.getElementById("graficoPrimaria"), {
+    type: "bar",
+    data: {
+      labels: ["P1","P2","P3","P4","P5","P6"],
+      datasets: [
+        { label: "Energía primaria total (kWh)", data: epPorPeriodo, backgroundColor: "#1f5c4a" }
+      ]
+    }
+  });
+
+  const totalSecundaria = euElecTotal + euGasTotal;
+  const pctElec = totalSecundaria ? ((euElecTotal / totalSecundaria) * 100).toFixed(1) : "0.0";
+  const pctGas = totalSecundaria ? ((euGasTotal / totalSecundaria) * 100).toFixed(1) : "0.0";
+
+  new Chart(document.getElementById("graficoTorta"), {
+    type: "pie",
+    data: {
+      labels: [`Electricidad (${pctElec}%)`, `Gas (${pctGas}%)`],
+      datasets: [{ data: [euElecTotal, euGasTotal], backgroundColor: ["#1f5c4a", "#e8a33d"] }]
+    }
+  });
+
+  document.getElementById("ep_total").textContent = epTotal.toFixed(0);
+  document.getElementById("indicador").textContent = indicador.toFixed(1);
+
+  document.getElementById("resultados").style.display = "block";
+  document.getElementById("tituloObra").textContent = obra ? ` · ${obra}` : "";
+  document.getElementById("resultados").scrollIntoView({ behavior: "smooth" });
+
+  ultimoResultado = {
+    obra, superficie, provincia,
+    elec, gas_m3, euElecTotal, euGasTotal,
+    elecPrimTotal, gasPrimTotal, epTotal, indicador,
+    fecha: new Date().toISOString()
+  };
+
+  guardarDatos(ultimoResultado);
+}
+
+/* ===== DESCARGA DE PDF ===== */
+function descargarPDF() {
+  if (!ultimoResultado) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const d = ultimoResultado;
+  let y = 20;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text(d.obra ? `Resumen de consumo — ${d.obra}` : "Resumen de consumo energético", 14, y);
+  y += 8;
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Provincia: ${d.provincia}  ·  Superficie: ${d.superficie} m²`, 14, y);
+  y += 6;
+  doc.text(`Fecha: ${new Date(d.fecha).toLocaleDateString("es-AR")}`, 14, y);
+  y += 12;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Indicador energético:", 14, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${d.indicador.toFixed(1)} kWh/m²·año`, 75, y);
+  y += 7;
+  doc.setFont("helvetica", "bold");
+  doc.text("Energía primaria total anual:", 14, y);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${d.epTotal.toFixed(0)} kWh`, 75, y);
+  y += 12;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("¿Querés ir más a fondo?", 14, y);
+  y += 7;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const lineasTexto = doc.splitTextToSize(TEXTO_PREETIQUETA, 180);
+  doc.text(lineasTexto, 14, y);
+  y += lineasTexto.length * 5 + 4;
+  doc.setFont("helvetica", "bold");
+  doc.text(CONTACTO_PREETIQUETA, 14, y);
+  y += 12;
+
+  // Gráficos (se capturan como imagen desde los canvas ya renderizados)
+  ["graficoUtil", "graficoPrimaria", "graficoTorta"].forEach(id => {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    if (y > 240) { doc.addPage(); y = 20; }
+    const img = canvas.toDataURL("image/png", 1.0);
+    doc.addImage(img, "PNG", 14, y, 160, 70);
+    y += 78;
+  });
+
+  const fechaArchivo = new Date(d.fecha).toISOString().slice(0, 10);
+  const slugObra = d.obra
+    ? d.obra.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+    : "vivienda";
+  doc.save(`resumen-consumo-${slugObra}-${fechaArchivo}.pdf`);
+}
+
+/* ===== GUARDADO DE DATOS =====
+   Llama a la función serverless propia (/api/guardar), que vive en Vercel.
+   El token de Airtable está guardado ahí como variable de entorno — nunca
+   viaja a este archivo ni al navegador del usuario. El registro es anónimo:
+   no incluye nombre ni email, solo datos de consumo.
+*/
+function guardarDatos(datos) {
+  const estado = document.getElementById("estadoGuardado");
+  estado.textContent = "Guardando...";
+
+  fetch("/api/guardar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(datos)
+  })
+    .then(res => res.json().then(body => ({ ok: res.ok, body })))
+    .then(({ ok, body }) => {
+      if (ok) {
+        estado.textContent = "Datos guardados correctamente.";
+      } else {
+        console.error("Error al guardar:", body);
+        estado.textContent = "No se pudo guardar. Igual podés descargar tu PDF.";
+      }
+    })
+    .catch(err => {
+      console.error("Error de red:", err);
+      estado.textContent = "No se pudo guardar. Igual podés descargar tu PDF.";
+    });
+}
+</script>
+</body>
+</html>
